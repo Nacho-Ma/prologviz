@@ -86,18 +86,6 @@ prologviz/
     └── trace.html.j2   # Template Jinja2 (TODO)
 ```
 
-## Estado
-
-- [x] Modelo de datos (`engine/tree.py`)
-- [x] Trace engine (`engine/tracer.py` + `engine/trace_hook.pl`)
-- [x] Renderer de terminal (`renderers/terminal.py`)
-- [x] CLI (`cli.py`) — `run` (con `--query-file`/stdin, `--setup`/`--setup-file`,
-  `--export`, `--max-depth`, `--max-solutions`) y `session` (REPL interactivo)
-- [x] Export HTML (`renderers/html.py` + `templates/trace.html.j2`) — colapsable, con búsqueda
-- [x] Tests (`pytest`) — 39, con skip automático del tracer si no hay SWI-Prolog
-- [~] TUI interactiva con textual (fase 2) — **descartada**: la consola + el export
-  HTML cubren el caso de uso; el HTML ya es navegable (colapsable + búsqueda).
-
 ## Notas de implementación (SWI-Prolog + pyswip)
 
 Captar el trace tuvo varias sutilezas que conviene documentar:
