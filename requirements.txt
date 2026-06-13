@@ -1,0 +1,4 @@
+pyswip>=0.3.2
+rich>=13.7
+click>=8.1
+jinja2>=3.1

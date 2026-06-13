@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>prologviz — {{ query }}</title>
+<style>
+  :root {
+    --bg: #1e1e2e; --panel: #27293d; --fg: #cdd6f4; --muted: #6c7086;
+    --call: #89b4fa; --exit: #a6e3a1; --fail: #f38ba8; --redo: #f9e2af;
+    --query: #cba6f7; --line: #45475a; --hit: #f9e2af33;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 0 4rem;
+    background: var(--bg); color: var(--fg);
+    font-family: ui-monospace, "Cascadia Code", "Fira Code", Consolas, monospace;
+    font-size: 14px; line-height: 1.5;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--panel); border-bottom: 1px solid var(--line);
+    padding: 1rem 1.5rem; display: flex; flex-wrap: wrap;
+    align-items: center; gap: 1rem;
+  }
+  h1 { font-size: 1rem; margin: 0; font-weight: 600; }
+  h1 .q { color: var(--query); }
+  .stats { color: var(--muted); font-size: .8rem; }
+  .search { margin-left: auto; display: flex; align-items: center; gap: .5rem; }
+  .search input {
+    background: var(--bg); border: 1px solid var(--line); color: var(--fg);
+    border-radius: 6px; padding: .4rem .7rem; font: inherit; width: 16rem;
+  }
+  .search input:focus { outline: 1px solid var(--call); }
+  .controls button {
+    background: var(--bg); border: 1px solid var(--line); color: var(--fg);
+    border-radius: 6px; padding: .4rem .7rem; font: inherit; cursor: pointer;
+  }
+  .controls button:hover { border-color: var(--call); }
+  main { padding: 1.5rem; }
+
+  ul.tree, ul.tree ul { list-style: none; margin: 0; padding: 0; }
+  ul.tree ul { margin-left: 1.1rem; border-left: 1px solid var(--line); padding-left: .6rem; }
+  li.node { margin: .1rem 0; }
+  li.node.hidden { display: none; }
+
+  .row { display: flex; align-items: center; gap: .4rem; border-radius: 5px; padding: .1rem .3rem; }
+  .row:hover { background: #ffffff0a; }
+  .toggle {
+    width: 1rem; flex: 0 0 1rem; text-align: center; cursor: pointer;
+    color: var(--muted); user-select: none;
+  }
+  .toggle.leaf { visibility: hidden; }
+  li.node.collapsed > ul { display: none; }
+  li.node.collapsed > .row .toggle::before { content: "▸"; }
+  li.node:not(.collapsed) > .row .toggle::before { content: "▾"; }
+  .toggle.leaf::before { content: "•"; }
+
+  .event { font-weight: 700; padding: 0 .35rem; border-radius: 4px; font-size: .78rem; }
+  .event.call { color: var(--call); }
+  .event.exit { color: var(--exit); }
+  .event.fail { color: var(--fail); }
+  .event.redo { color: var(--redo); }
+  .goal { cursor: default; }
+  .goal.call { color: var(--call); }
+  .goal.exit { color: var(--exit); }
+  .goal.fail { color: var(--fail); }
+  .goal.redo { color: var(--redo); }
+  .mark { font-weight: 700; }
+  .mark.ok { color: var(--exit); }
+  .mark.no { color: var(--fail); }
+  .badge {
+    font-size: .68rem; color: var(--redo); border: 1px solid var(--redo);
+    border-radius: 999px; padding: 0 .45rem; opacity: .8;
+  }
+  mark { background: var(--hit); color: inherit; border-radius: 3px; }
+
+  .solutions { margin-top: 2rem; background: var(--panel); border-radius: 8px; padding: 1rem 1.25rem; }
+  .solutions h2 { margin: 0 0 .6rem; font-size: .95rem; color: var(--query); }
+  .solutions ol { margin: 0; padding-left: 1.2rem; }
+  .solutions .var { color: var(--call); }
+  .solutions .val { color: var(--exit); font-weight: 600; }
+  .solutions .false { color: var(--fail); font-weight: 700; }
+  .solutions .count { color: var(--muted); font-size: .8rem; margin-top: .5rem; }
+
+  .legend { display: flex; gap: 1rem; color: var(--muted); font-size: .78rem; margin-top: 1.5rem; }
+  .legend b.call { color: var(--call); } .legend b.exit { color: var(--exit); }
+  .legend b.fail { color: var(--fail); } .legend b.redo { color: var(--redo); }
+  .nomatch { color: var(--muted); margin: 1rem 0; display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>prologviz &nbsp;·&nbsp; <span class="q">?- {{ query }}</span></h1>
+  <span class="stats">{{ node_count }} nodos · {{ event_count }} eventos</span>
+  <div class="search">
+    <span class="controls"><button id="expand">Expandir</button>
+    <button id="collapse">Colapsar</button></span>
+    <input id="q" type="search" placeholder="Buscar goal…" autocomplete="off">
+  </div>
+</header>
+
+<main>
+{% macro render_node(node) %}
+  <li class="node {{ 'collapsed' if node.children and node.depth >= 2 else '' }}"
+      data-goal="{{ node.goal|lower }}">
+    <div class="row">
+      <span class="toggle {{ 'leaf' if not node.children else '' }}"></span>
+      <span class="event {{ node.event }}">{{ node.event|upper }}</span>
+      <span class="goal {{ node.event }}">{{ node.goal }}</span>
+      {% if node.event == 'exit' %}<span class="mark ok">✓</span>{% endif %}
+      {% if node.event == 'fail' %}<span class="mark no">✗</span>{% endif %}
+      {% if node.is_retry %}<span class="badge">backtrack</span>{% endif %}
+    </div>
+    {% if node.children %}
+    <ul>
+      {% for child in node.children %}{{ render_node(child) }}{% endfor %}
+    </ul>
+    {% endif %}
+  </li>
+{% endmacro %}
+
+  <ul class="tree" id="tree">
+    {% for root in roots %}{{ render_node(root) }}{% endfor %}
+  </ul>
+
+  <p class="nomatch" id="nomatch">Ningún goal coincide con la búsqueda.</p>
+
+  <div class="legend">
+    <span><b class="call">CALL</b> intento</span>
+    <span><b class="exit">EXIT</b> éxito</span>
+    <span><b class="fail">FAIL</b> fallo</span>
+    <span><b class="redo">REDO</b> backtrack</span>
+  </div>
+
+  {% if solutions is not none %}
+  <div class="solutions">
+    <h2>Soluciones</h2>
+    {% if solutions|length == 0 %}
+    <div class="false">false.</div>
+    {% else %}
+    <ol>
+      {% for sol in solutions %}
+      <li>
+        {% if sol|length == 0 %}<span class="val">true</span>
+        {% else %}
+        {% for var, val in sol.items() %}<span class="var">{{ var }}</span> = <span class="val">{{ val }}</span>{% if not loop.last %}, {% endif %}{% endfor %}
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    <div class="count">{{ solutions|length }} {{ 'solución' if solutions|length == 1 else 'soluciones' }}</div>
+    {% endif %}
+  </div>
+  {% endif %}
+</main>
+
+<script>
+(function () {
+  const tree = document.getElementById('tree');
+
+  // Colapsar / expandir al click en el toggle.
+  tree.addEventListener('click', function (e) {
+    const t = e.target.closest('.toggle');
+    if (!t || t.classList.contains('leaf')) return;
+    t.closest('li.node').classList.toggle('collapsed');
+  });
+
+  document.getElementById('expand').onclick = () =>
+    tree.querySelectorAll('li.node').forEach(li => li.classList.remove('collapsed'));
+  document.getElementById('collapse').onclick = () =>
+    tree.querySelectorAll('li.node').forEach(li => {
+      if (li.querySelector('ul')) li.classList.add('collapsed');
+    });
+
+  // Búsqueda: resalta coincidencias y oculta ramas sin matches.
+  const input = document.getElementById('q');
+  const nomatch = document.getElementById('nomatch');
+  const nodes = Array.from(tree.querySelectorAll('li.node'));
+
+  function clearMarks() {
+    tree.querySelectorAll('.goal').forEach(g => { g.innerHTML = g.textContent; });
+  }
+
+  input.addEventListener('input', function () {
+    const q = input.value.trim().toLowerCase();
+    clearMarks();
+
+    if (!q) {
+      nodes.forEach(li => li.classList.remove('hidden'));
+      nomatch.style.display = 'none';
+      return;
+    }
+
+    let any = false;
+    nodes.forEach(li => li.classList.add('hidden'));
+
+    nodes.forEach(li => {
+      if ((li.dataset.goal || '').includes(q)) {
+        any = true;
+        // Mostrar el nodo y toda su cadena de ancestros (expandiéndolos).
+        let cur = li;
+        while (cur && cur.classList.contains('node')) {
+          cur.classList.remove('hidden', 'collapsed');
+          cur = cur.parentElement.closest('li.node');
+        }
+        // Resaltar el texto coincidente en el goal.
+        const goal = li.querySelector(':scope > .row > .goal');
+        if (goal) {
+          const txt = goal.textContent;
+          const i = txt.toLowerCase().indexOf(q);
+          if (i >= 0) {
+            goal.innerHTML = txt.slice(0, i) + '<mark>' +
+              txt.slice(i, i + q.length) + '</mark>' + txt.slice(i + q.length);
+          }
+        }
+      }
+    });
+
+    nomatch.style.display = any ? 'none' : 'block';
+  });
+})();
+</script>
+</body>
+</html>
