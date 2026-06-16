@@ -106,10 +106,11 @@
       data-goal="{{ node.goal|lower }}">
     <div class="row">
       <span class="toggle {{ 'leaf' if not node.children else '' }}"></span>
-      <span class="event {{ node.event }}">{{ node.event|upper }}</span>
-      <span class="goal {{ node.event }}">{{ node.goal }}</span>
-      {% if node.event == 'exit' %}<span class="mark ok">✓</span>{% endif %}
-      {% if node.event == 'fail' %}<span class="mark no">✗</span>{% endif %}
+      <span class="event {{ node.outcome }}">{{ node.outcome|upper }}</span>
+      <span class="goal {{ node.outcome }}">{{ node.goal }}</span>
+      {% if node.outcome == 'exit' %}<span class="mark ok">✓</span>{% endif %}
+      {% if node.outcome == 'fail' %}<span class="mark no">✗</span>{% endif %}
+      {% if node.exit_count > 1 %}<span class="badge">{{ node.exit_count }} sol.</span>{% endif %}
       {% if node.is_retry %}<span class="badge">backtrack</span>{% endif %}
     </div>
     {% if node.children %}

@@ -52,12 +52,20 @@ else:
 
 
 def _node_label(node: TraceNode) -> Text:
-    """Construye la etiqueta coloreada de un nodo: ``EVENT goal ✓``."""
-    style = _EVENT_STYLE.get(node.event, "white")
+    """Construye la etiqueta coloreada de un nodo según su *resultado global*.
+
+    Usa ``node.outcome`` (no el último puerto), así un goal que tuvo éxito y
+    luego falló al backtrackear se muestra en verde con ✓, no en rojo.
+    """
+    outcome = node.outcome
+    style = _EVENT_STYLE.get(outcome, "white")
     label = Text()
-    label.append(f"{node.event.upper()} ", style=f"bold {style}")
+    label.append(f"{outcome.upper()} ", style=f"bold {style}")
     label.append(node.goal, style=style)
-    label.append(_RESULT_MARK.get(node.event, ""), style=f"bold {style}")
+    label.append(_RESULT_MARK.get(outcome, ""), style=f"bold {style}")
+    # Si el goal tuvo varias soluciones, lo indicamos.
+    if node.exit_count > 1:
+        label.append(f" ({node.exit_count} sol.)", style=f"dim {style}")
     if node.is_retry:
         label.append("  [backtrack]", style="dim yellow")
     return label

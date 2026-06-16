@@ -27,9 +27,11 @@ def _node_to_dict(node: TraceNode) -> dict:
     """Serializa un `TraceNode` (y sus hijos) a un dict simple para el template."""
     return {
         "event": node.event,
+        "outcome": node.outcome,        # resultado global (exit si tuvo ≥1 éxito)
         "goal": node.goal,
         "success": node.success,
         "is_retry": node.is_retry,
+        "exit_count": node.exit_count,
         "depth": node.depth,
         "children": [_node_to_dict(child) for child in node.children],
     }

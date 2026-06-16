@@ -127,6 +127,45 @@ def test_redo_en_nivel_0_genera_multiples_roots():
     assert tree.get_root().predicate == "<query>"
 
 
+# --------------------------------------------------------- outcome / exit_count
+
+def test_outcome_exit_gana_sobre_fail_posterior():
+    """Un goal que exitea y luego falla (al agotar backtracking) sigue siendo exit."""
+    tree = TraceTree()
+    tree.add_event("call", "arreglo", ["5", "3", "X"], 0)
+    tree.add_event("exit", "arreglo", ["5", "3", "60"], 0)
+    tree.add_event("fail", "arreglo", ["5", "3", "X"], 0)  # backtracking agotado
+    root = tree.get_root()
+    assert root.event == "fail"          # el último puerto fue fail
+    assert root.exit_count == 1
+    assert root.outcome == EXIT          # pero el resultado global es éxito
+    # y conserva los argumentos ligados de la solución, no los del fail
+    assert root.goal == "arreglo(5, 3, 60)"
+
+
+def test_outcome_fail_puro():
+    tree = TraceTree()
+    tree.add_event("call", "p", ["X"], 0)
+    tree.add_event("fail", "p", ["X"], 0)
+    assert tree.get_root().outcome == FAIL
+
+
+def test_exit_count_cuenta_soluciones():
+    tree = TraceTree()
+    tree.add_event("call", "p", ["X"], 0)
+    tree.add_event("exit", "p", ["a"], 0)
+    tree.add_event("exit", "p", ["b"], 0)  # segunda solución del mismo frame
+    root = tree.get_root()
+    assert root.exit_count == 2
+    assert root.outcome == EXIT
+
+
+def test_outcome_call_abierto():
+    tree = TraceTree()
+    tree.add_event("call", "p", ["X"], 0)  # sin cerrar (trace cortado)
+    assert tree.get_root().outcome == CALL
+
+
 # ----------------------------------------------------------------- varios
 
 def test_evento_invalido_lanza():

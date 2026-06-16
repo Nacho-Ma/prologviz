@@ -51,8 +51,9 @@ class TraceNode:
     args: list[str] = field(default_factory=list)   # args como strings legibles
     depth: int = 0                          # profundidad en el árbol
     children: list[TraceNode] = field(default_factory=list)
-    success: bool = False                   # True si el nodo terminó en `exit`
+    success: bool = False                   # True si el ÚLTIMO evento fue `exit`
     is_retry: bool = False                  # True si nació de un `redo` (backtrack)
+    exit_count: int = 0                     # cuántas veces el goal hizo `exit` (soluciones)
     # Referencia al nodo padre, útil para navegar hacia arriba. Se excluye de
     # repr/compare para no entrar en recursión infinita (el padre apunta a sus
     # hijos y viceversa).
@@ -64,6 +65,20 @@ class TraceNode:
         if not self.args:
             return self.predicate
         return f"{self.predicate}({', '.join(self.args)})"
+
+    @property
+    def outcome(self) -> str:
+        """Resultado *global* del goal, no solo su último puerto.
+
+        Un goal que tuvo al menos un `exit` se considera ``exit`` (tuvo éxito),
+        aunque después haya fallado al backtrackear buscando más soluciones. Esto
+        evita pintar de rojo un goal que en realidad sí encontró una respuesta.
+        """
+        if self.exit_count > 0:
+            return EXIT
+        if self.event == FAIL:
+            return FAIL
+        return self.event  # `call` o `redo`: todavía abierto / sin cerrar
 
     def add_child(self, node: TraceNode) -> TraceNode:
         node.parent = self
@@ -217,9 +232,16 @@ class TraceTree:
 
         node.event = event
         node.success = event == EXIT
-        # En el exit los argumentos ya están unificados: preferimos esos valores.
-        if args:
-            node.args = args
+        if event == EXIT:
+            node.exit_count += 1
+            # En el exit los argumentos ya están unificados: preferimos esos valores.
+            if args:
+                node.args = args
+        else:
+            # En un `fail` solo actualizamos los args si el goal nunca tuvo éxito;
+            # si ya había exiteado, conservamos los valores ligados de la solución.
+            if args and node.exit_count == 0:
+                node.args = args
 
         # El nodo sigue siendo el "más reciente" a su nivel (un `redo` posterior
         # más profundo aún puede colgar de él), pero todo lo que estaba por debajo

@@ -101,6 +101,29 @@ def test_render_sin_solutions_no_imprime_bloque():
     assert "Soluciones:" not in out
 
 
+def test_node_label_exit_then_fail_es_verde():
+    # Un goal que exitea y luego falla debe mostrarse como EXIT (verde), no FAIL.
+    tree = TraceTree()
+    tree.add_event("call", "arreglo", ["5", "3", "X"], 0)
+    tree.add_event("exit", "arreglo", ["5", "3", "60"], 0)
+    tree.add_event("fail", "arreglo", ["5", "3", "X"], 0)
+    label = terminal._node_label(tree.get_root())
+    estilos = " ".join(str(span.style) for span in label.spans)
+    assert "green" in estilos
+    assert "red" not in estilos
+    assert "EXIT" in label.plain
+    assert "arreglo(5, 3, 60)" in label.plain
+
+
+def test_node_label_varias_soluciones_muestra_conteo():
+    tree = TraceTree()
+    tree.add_event("call", "p", ["X"], 0)
+    tree.add_event("exit", "p", ["a"], 0)
+    tree.add_event("exit", "p", ["b"], 0)
+    label = terminal._node_label(tree.get_root())
+    assert "2 sol." in label.plain
+
+
 def test_marca_backtrack_en_retry():
     tree = TraceTree()
     tree.add_event("call", "p", [], 0)
